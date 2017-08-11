@@ -161,6 +161,9 @@ class HandshakeSettings(object):
         did not advertise support for any curves. It does not have to be the
         first curve for eccCurves and may be distinct from curves from that
         list.
+
+    :vartype keyShares: list
+    :ivar keyShares: list of TLS 1.3 key shares to include in Client Hello
     """
     def __init__(self):
         self.minKeySize = 1023
@@ -185,6 +188,7 @@ class HandshakeSettings(object):
         self.dhParams = None
         self.dhGroups = list(ALL_DH_GROUP_NAMES)
         self.defaultCurve = "secp256r1"
+        self.keyShares = ["secp256r1", "x25519"]
 
     @staticmethod
     def _sanityCheckKeySizes(other):
@@ -256,6 +260,20 @@ class HandshakeSettings(object):
             raise ValueError("Unknown FFDHE group name: '{0}'"
                              .format(unknownDHGroup))
 
+        unknownKeyShare = [val for val in other.keyShares
+                           if val not in ALL_DH_GROUP_NAMES and
+                           val not in ALL_CURVE_NAMES]
+        if unknownKeyShare:
+            raise ValueError("Unknown key share: '{0}'"
+                             .format(unknownKeyShare))
+
+        nonAdvertisedGroup = [val for val in other.keyShares
+                              if val not in other.eccCurves and
+                              val not in other.dhGroups]
+        if nonAdvertisedGroup:
+            raise ValueError("Key shares for not enabled groups specified: {0}"
+                             .format(nonAdvertisedGroup))
+
     @staticmethod
     def _sanityCheckProtocolVersions(other):
         """Check if set protocol version are sane"""
@@ -316,6 +334,7 @@ class HandshakeSettings(object):
         other.dhGroups = self.dhGroups
         other.defaultCurve = self.defaultCurve
         other.versions = self.versions
+        other.keyShares = self.keyShares
 
         if not cipherfactory.tripleDESPresent:
             other.cipherNames = [i for i in self.cipherNames if i != "3des"]
