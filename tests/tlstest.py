@@ -109,7 +109,9 @@ def clientTestCmd(argv):
     print("Test {0} - anonymous handshake".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientAnonymous()
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientAnonymous(settings=settings)
     testConnClient(connection)
     connection.close()
 
@@ -173,6 +175,7 @@ def clientTestCmd(argv):
     settings = HandshakeSettings()
     settings.macNames = ["md5"]
     settings.cipherNames = ["rc4"]
+    settings.maxVersion = (3, 3)
     connection.handshakeClientCert(settings=settings)
     testConnClient(connection)    
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
@@ -184,6 +187,7 @@ def clientTestCmd(argv):
 
         settings = HandshakeSettings()
         settings.useExperimentalTackExtension = True
+        settings.maxVersion = (3, 3)
 
         test_no += 1
 
@@ -226,7 +230,9 @@ def clientTestCmd(argv):
     print("Test {0} - good SRP (db)".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientSRP("test", "password")
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientSRP("test", "password", settings=settings)
     testConnClient(connection)
     connection.close()
 
@@ -235,7 +241,9 @@ def clientTestCmd(argv):
     print("Test {0} - good SRP".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientSRP("test", "password")
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientSRP("test", "password", settings=settings)
     testConnClient(connection)
     connection.close()
 
@@ -246,8 +254,11 @@ def clientTestCmd(argv):
         synchro.recv(1)
         connection = connect()
         connection.fault = fault
+        settings = HandshakeSettings()
+        settings.maxVersion = (3, 3)
         try:
-            connection.handshakeClientSRP("test", "password")
+            connection.handshakeClientSRP("test", "password",
+                                          settings=settings)
             print("  Good Fault %s" % (Fault.faultNames[fault]))
         except TLSFaultError as e:
             print("  BAD FAULT %s: %s" % (Fault.faultNames[fault], str(e)))
@@ -273,8 +284,11 @@ def clientTestCmd(argv):
         synchro.recv(1)
         connection = connect()
         connection.fault = fault
+        settings = HandshakeSettings()
+        settings.maxVersion = (3, 3)
         try:
-            connection.handshakeClientSRP("test", "password")
+            connection.handshakeClientSRP("test", "password",
+                                          settings=settings)
             print("  Good Fault %s" % (Fault.faultNames[fault]))
         except TLSFaultError as e:
             print("  BAD FAULT %s: %s" % (Fault.faultNames[fault], str(e)))
@@ -304,7 +318,10 @@ def clientTestCmd(argv):
 
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(x509Chain, x509Key)
+    # TODO add client certificate support in TLS 1.3
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(x509Chain, x509Key, settings=settings)
     testConnClient(connection)
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
     connection.close()
@@ -355,7 +372,10 @@ def clientTestCmd(argv):
           format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientSRP("test", "password", serverName=address[0])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientSRP("test", "password", serverName=address[0],
+                                  settings=settings)
     testConnClient(connection)
     connection.close()
     session = connection.session
@@ -365,8 +385,10 @@ def clientTestCmd(argv):
     print("Test {0} - resumption (plus SNI)".format(test_no))
     synchro.recv(1)
     connection = connect()
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
     connection.handshakeClientSRP("test", "garbage", serverName=address[0], 
-                                    session=session)
+                                  session=session, settings=settings)
     testConnClient(connection)
     #Don't close! -- see below
 
@@ -377,9 +399,12 @@ def clientTestCmd(argv):
     connection.sock.close() #Close the socket without a close_notify!
     synchro.recv(1)
     connection = connect()
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
     try:
-        connection.handshakeClientSRP("test", "garbage", 
-                        serverName=address[0], session=session)
+        connection.handshakeClientSRP("test", "garbage",
+                                      serverName=address[0],
+                                      session=session, settings=settings)
         assert(False)
     except TLSRemoteAlert as alert:
         if alert.description != AlertDescription.bad_record_mac:
@@ -475,6 +500,8 @@ def clientTestCmd(argv):
             settings = HandshakeSettings()
             settings.cipherNames = [cipher]
             settings.cipherImplementations = [implementation, "python"]
+            if cipher not in ("aes128gcm", "aes256gcm", "chacha20-poly1305"):
+                settings.maxVersion = (3, 3)
             connection.handshakeClientCert(settings=settings)
             print("%s %s:" % (connection.getCipherName(), connection.getCipherImplementation()), end=' ')
 
@@ -496,7 +523,9 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"http/1.1"], settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'http/1.1')
     connection.close()
@@ -506,7 +535,10 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"],
+                                   settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'spdy/2')
     connection.close()
@@ -516,7 +548,10 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"],
+                                   settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'spdy/2')
     connection.close()
@@ -526,7 +561,11 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"spdy/3", b"spdy/2", b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"spdy/3", b"spdy/2",
+                                               b"http/1.1"],
+                                   settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'spdy/2')
     connection.close()
@@ -536,7 +575,11 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"spdy/3", b"spdy/2", b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"spdy/3", b"spdy/2",
+                                               b"http/1.1"],
+                                   settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'spdy/3')
     connection.close()
@@ -546,7 +589,9 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"http/1.1"], settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'http/1.1')
     connection.close()
@@ -556,7 +601,10 @@ def clientTestCmd(argv):
     print("Test {0} - Next-Protocol Client Negotiation".format(test_no))
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"])
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(nextProtos=[b"spdy/2", b"http/1.1"],
+                                   settings=settings)
     #print("  Next-Protocol Negotiated: %s" % connection.next_proto)
     assert(connection.next_proto == b'spdy/2')
     connection.close()
@@ -568,6 +616,8 @@ def clientTestCmd(argv):
     connection = connect()
     settings = HandshakeSettings()
     settings.sendFallbackSCSV = True
+    settings.maxVersion = (3, 3)
+    # TODO fix FALLBACK_SCSV with TLS 1.3
     connection.handshakeClientCert(settings=settings)
     testConnClient(connection)
     connection.close()
@@ -595,6 +645,7 @@ def clientTestCmd(argv):
     connection = connect()
     settings = HandshakeSettings()
     settings.macNames.remove("aead")
+    settings.maxVersion = (3, 3)
     assert(settings.useEncryptThenMAC)
     connection.handshakeClientCert(serverName=address[0], settings=settings)
     testConnClient(connection)
@@ -611,6 +662,7 @@ def clientTestCmd(argv):
     settings = HandshakeSettings()
     settings.macNames.remove("aead")
     settings.useEncryptThenMAC = False
+    settings.maxVersion = (3, 3)
     connection.handshakeClientCert(serverName=address[0], settings=settings)
     testConnClient(connection)
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
@@ -625,6 +677,7 @@ def clientTestCmd(argv):
     connection = connect()
     settings = HandshakeSettings()
     settings.macNames.remove("aead")
+    settings.maxVersion = (3, 3)
     connection.handshakeClientCert(serverName=address[0], settings=settings)
     testConnClient(connection)
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
@@ -637,7 +690,10 @@ def clientTestCmd(argv):
     # resume
     synchro.recv(1)
     connection = connect()
-    connection.handshakeClientCert(serverName=address[0], session=session)
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    connection.handshakeClientCert(serverName=address[0], session=session,
+                                   settings=settings)
     testConnClient(connection)
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
     assert(connection.session.serverName == address[0])
@@ -652,6 +708,7 @@ def clientTestCmd(argv):
     connection = connect()
     settings = HandshakeSettings()
     settings.macNames.remove("aead")
+    settings.maxVersion = (3, 3)
     connection.handshakeClientCert(serverName=address[0], settings=settings)
     testConnClient(connection)
     assert(isinstance(connection.session.serverCertChain, X509CertChain))
@@ -666,6 +723,7 @@ def clientTestCmd(argv):
     settings = HandshakeSettings()
     settings.useEncryptThenMAC = False
     settings.macNames.remove("aead")
+    settings.maxVersion = (3, 3)
     connection = connect()
     try:
         connection.handshakeClientCert(serverName=address[0], session=session,
@@ -811,7 +869,7 @@ def serverTestCmd(argv):
 
     test_no += 1
 
-    print("Test {0} - good X.509".format(test_no))
+    print("Test {0} - good X.509 (plus SNI)".format(test_no))
     synchro.send(b'R')
     connection = connect()
     connection.handshakeServer(certChain=x509Chain, privateKey=x509Key)
@@ -827,7 +885,6 @@ def serverTestCmd(argv):
     connection = connect()
     connection.handshakeServer(certChain=x509ChainRSAPSSSig,
                                privateKey=x509KeyRSAPSSSig)
-    assert(connection.session.serverName == address[0])
     assert(connection.extendedMasterSecret)
     testConnServer(connection)
     connection.close()
@@ -1257,7 +1314,11 @@ def serverTestCmd(argv):
     print("Test {0} - FALLBACK_SCSV".format(test_no))
     synchro.send(b'R')
     connection = connect()
-    connection.handshakeServer(certChain=x509Chain, privateKey=x509Key)
+    settings = HandshakeSettings()
+    settings.maxVersion = (3, 3)
+    # TODO fix FALLBACK with TLS1.3
+    connection.handshakeServer(certChain=x509Chain, privateKey=x509Key,
+                               settings=settings)
     testConnServer(connection)
     connection.close()
 
@@ -1266,8 +1327,12 @@ def serverTestCmd(argv):
     print("Test {0} - FALLBACK_SCSV".format(test_no))
     synchro.send(b'R')
     connection = connect()
+    settings = HandshakeSettings()
+    # TODO fix FALLBACK with TLS1.3
+    settings.maxVersion = (3, 3)
     try:
-        connection.handshakeServer(certChain=x509Chain, privateKey=x509Key)
+        connection.handshakeServer(certChain=x509Chain, privateKey=x509Key,
+                                   settings=settings)
         assert()
     except TLSLocalAlert as alert:
         if alert.description != AlertDescription.inappropriate_fallback:
