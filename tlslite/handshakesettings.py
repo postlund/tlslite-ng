@@ -25,6 +25,7 @@ KEY_EXCHANGE_NAMES = ["rsa", "dhe_rsa", "ecdhe_rsa", "srp_sha", "srp_sha_rsa",
 CIPHER_IMPLEMENTATIONS = ["openssl", "pycrypto", "python"]
 CERTIFICATE_TYPES = ["x509"]
 RSA_SIGNATURE_HASHES = ["sha512", "sha384", "sha256", "sha224", "sha1"]
+ECDSA_SIGNATURE_HASHES = ["sha512", "sha384", "sha256", "sha224", "sha1"]
 ALL_RSA_SIGNATURE_HASHES = RSA_SIGNATURE_HASHES + ["md5"]
 RSA_SCHEMES = ["pss", "pkcs1"]
 # while secp521r1 is the most secure, it's also much slower than the others
@@ -140,6 +141,16 @@ class HandshakeSettings(object):
         The allowed hashes are: "md5", "sha1", "sha224", "sha256",
         "sha384" and "sha512". The default list does not include md5.
 
+    :vartype ecdsaSigHashes: list
+    :ivar ecdsaSigHashes: List of hashes supported (and advertised as such) for
+        TLS 1.2 signatures over Server Key Exchange or Certificate Verify with
+        ECDSA signature algorithm.
+
+        The list is sorted from most wanted to least wanted algorithm.
+
+        The allowed hashes are: "sha1", "sha224", "sha256",
+        "sha384" and "sha512".
+
     :vartype eccCurves: list
     :ivar eccCurves: List of named curves that are to be supported
 
@@ -178,6 +189,7 @@ class HandshakeSettings(object):
         self.useEncryptThenMAC = True
         self.rsaSigHashes = list(RSA_SIGNATURE_HASHES)
         self.rsaSchemes = list(RSA_SCHEMES)
+        self.ecdsaSigHashes = list(ECDSA_SIGNATURE_HASHES)
         self.eccCurves = list(CURVE_NAMES)
         self.usePaddingExtension = True
         self.useExtendedMasterSecret = True
@@ -250,6 +262,12 @@ class HandshakeSettings(object):
             raise ValueError("Unknown RSA padding mode: '{0}'".\
                              format(unknownRSAPad))
 
+        unknownSigHash = [val for val in other.ecdsaSigHashes \
+                          if val not in ECDSA_SIGNATURE_HASHES]
+        if unknownSigHash:
+            raise ValueError("Unknown ECDSA signature hash: '{0}'".\
+                             format(unknownSigHash))
+
         unknownDHGroup = [val for val in other.dhGroups
                           if val not in ALL_DH_GROUP_NAMES]
         if unknownDHGroup:
@@ -309,6 +327,7 @@ class HandshakeSettings(object):
         other.usePaddingExtension = self.usePaddingExtension
         other.rsaSigHashes = self.rsaSigHashes
         other.rsaSchemes = self.rsaSchemes
+        other.ecdsaSigHashes = self.ecdsaSigHashes
         other.eccCurves = self.eccCurves
         other.useExtendedMasterSecret = self.useExtendedMasterSecret
         other.requireExtendedMasterSecret = self.requireExtendedMasterSecret
@@ -346,7 +365,8 @@ class HandshakeSettings(object):
             other.macNames = [e for e in self.macNames if \
                               e == "sha" or e == "md5"]
 
-        if len(other.rsaSigHashes) == 0 and other.maxVersion >= (3, 3):
+        if len(other.rsaSigHashes) == 0 and len(other.ecdsaSigHashes) == 0 \
+               and other.maxVersion >= (3, 3):
             raise ValueError("TLS 1.2 requires signature algorithms to be set")
 
         if other.dhParams and (len(other.dhParams) != 2 or
