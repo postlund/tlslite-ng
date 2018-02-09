@@ -493,7 +493,8 @@ class TLSConnection(TLSRecordLayer):
 
         # if we're doing tls1.3, use the new code as the negotiation is much
         # different
-        if serverHello.server_version > (3, 3):
+        ext = serverHello.getExtension(ExtensionType.supported_versions)
+        if ext and ext.version > (3, 3):
             for result in self._clientTLS13Handshake(settings, clientHello,
                                                      serverHello):
                 if result in (0, 1):
@@ -748,7 +749,9 @@ class TLSConnection(TLSRecordLayer):
             else: break
 
         hello_retry = None
-        if result.random == TLS_1_3_HRR:
+        ext = result.getExtension(ExtensionType.supported_versions)
+        if result.random == TLS_1_3_HRR and ext and ext.version > (3, 3):
+            self.version = (3, 3)
             hello_retry = result
 
             # create synthetic handshake hash
@@ -836,11 +839,12 @@ class TLSConnection(TLSRecordLayer):
 
         #Get the server version.  Do this before anything else, so any
         #error alerts will use the server's version
-        self.version = serverHello.server_version
-        # TODO remove when TLS 1.3 is final (server_version will be set to
-        # draft version in draft protocol implementations)
-        if self.version > (3, 4):
-            self.version = (3, 4)
+        real_version = serverHello.server_version
+        if serverHello.server_version >= (3, 3):
+            ext = serverHello.getExtension(ExtensionType.supported_versions)
+            if ext:
+                real_version = ext.version
+        self.version = real_version
 
         #Check ServerHello
         if hello_retry and \
@@ -849,21 +853,20 @@ class TLSConnection(TLSRecordLayer):
                                           "server selected different cipher "
                                           "in HRR and Server Hello"):
                 yield result
-        if serverHello.server_version < settings.minVersion:
+        if real_version < settings.minVersion:
             for result in self._sendError(\
                 AlertDescription.protocol_version,
-                "Too old version: %s" % str(serverHello.server_version)):
+                "Too old version: %s" % str(real_version)):
                 yield result
-        if serverHello.server_version > settings.maxVersion and \
-                serverHello.server_version not in settings.versions:
+        if real_version > settings.maxVersion and \
+                real_version not in settings.versions:
             for result in self._sendError(\
                 AlertDescription.protocol_version,
-                "Too new version: %s" % str(serverHello.server_version)):
+                "Too new version: %s" % str(real_version)):
                 yield result
-        serverVer = serverHello.server_version
         cipherSuites = CipherSuite.filterForVersion(clientHello.cipher_suites,
-                                                    minVersion=serverVer,
-                                                    maxVersion=serverVer)
+                                                    minVersion=real_version,
+                                                    maxVersion=real_version)
         if serverHello.cipher_suite not in cipherSuites:
             for result in self._sendError(\
                 AlertDescription.illegal_parameter,
@@ -874,7 +877,7 @@ class TLSConnection(TLSRecordLayer):
                 AlertDescription.illegal_parameter,
                 "Server responded with incorrect certificate type"):
                 yield result
-        if serverVer <= (3, 3) and serverHello.compression_method != 0:
+        if serverHello.compression_method != 0:
             for result in self._sendError(\
                 AlertDescription.illegal_parameter,
                 "Server responded with incorrect compression method"):
@@ -1857,9 +1860,12 @@ class TLSConnection(TLSRecordLayer):
 
         sh_extensions = []
         sh_extensions.append(ServerKeyShareExtension().create(key_share))
+        sh_extensions.append(SrvSupportedVersionsExtension().create(version))
 
         serverHello = ServerHello()
-        serverHello.create(version, getRandomBytes(32),
+        # in TLS1.3 the version selected is sent in extension, (3, 3) is
+        # just dummy value to workaround broken middleboxes
+        serverHello.create((3, 3), getRandomBytes(32),
                            clientHello.session_id,
                            cipherSuite, extensions=sh_extensions)
 
@@ -2035,9 +2041,9 @@ class TLSConnection(TLSRecordLayer):
         # Tentatively set version to most-desirable version, so if an error
         # occurs parsing the ClientHello, this will be the version we'll use
         # for the error alert
-        # If TLS 1.3 is enabled, use the "universal" TLS 1.x version
+        # If TLS 1.3 is enabled, use the "compatible" TLS 1.2 version
         self.version = settings.maxVersion if settings.maxVersion < (3, 4) \
-                       else (3, 1)
+                       else (3, 3)
 
         #Get ClientHello
         for result in self._getMsg(ContentType.handshake,
@@ -2197,8 +2203,8 @@ class TLSConnection(TLSRecordLayer):
             # when we selected TLS 1.3, we cannot set the record layer to
             # it as well as that also switches it to a mode where the
             # content type is encrypted
-            # use a generic TLS version instead
-            self.version = (3, 1)
+            # use the backwards compatible TLS 1.2 version instead
+            self.version = (3, 3)
             version = high_ver
         elif clientHello.client_version > settings.maxVersion:
             # in TLS 1.3 the version is negotiatied with extension,
@@ -2503,9 +2509,15 @@ class TLSConnection(TLSRecordLayer):
                 writer.addVarSeq(client_hello_hash, 1, 3)
                 self._handshake_hash.update(writer.bytes)
 
+                # send the version that was really selected
+                vers = SrvSupportedVersionsExtension().create(version)
+                hrr_ext.append(vers)
+
                 # send the HRR
                 hrr = ServerHello()
-                hrr.create(version, TLS_1_3_HRR, clientHello.session_id,
+                # version is hardcoded in TLS 1.3, and real version
+                # is sent as extension
+                hrr.create((3, 3), TLS_1_3_HRR, clientHello.session_id,
                            cipherSuite, extensions=hrr_ext)
 
                 for result in self._sendMsg(hrr):
