@@ -1479,7 +1479,9 @@ class TestECPointFormatsExtension(unittest.TestCase):
 
     def test_repr(self):
         ext = ECPointFormatsExtension().create([ECPointFormat.uncompressed])
-        self.assertEqual("ECPointFormatsExtension(formats=[0])", repr(ext))
+        self.assertEqual("ECPointFormatsExtension(formats=[uncompressed])",
+                         repr(ext))
+
 
 class TestSignatureAlgorithmsExtension(unittest.TestCase):
     def test__init__(self):
