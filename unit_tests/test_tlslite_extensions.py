@@ -2507,6 +2507,12 @@ class TestPskKeyExchangeModesExtension(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             ext.parse(parser)
 
+    def test_repr(self):
+        ext = PskKeyExchangeModesExtension().create([0, 1])
+
+        self.assertEqual(repr(ext),
+            "PskKeyExchangeModesExtension(modes=[psk_ke, psk_dhe_ke])")
+
 
 if __name__ == '__main__':
     unittest.main()
