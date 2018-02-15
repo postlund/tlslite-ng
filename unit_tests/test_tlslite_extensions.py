@@ -1438,8 +1438,9 @@ class TestSupportedGroups(unittest.TestCase):
 
     def test_repr(self):
         ext = SupportedGroupsExtension().create([GroupName.secp256r1])
-        self.assertEqual("SupportedGroupsExtension(groups=[23])",
+        self.assertEqual("SupportedGroupsExtension(groups=[secp256r1])",
                 repr(ext))
+
 
 class TestECPointFormatsExtension(unittest.TestCase):
     def test___init__(self):
