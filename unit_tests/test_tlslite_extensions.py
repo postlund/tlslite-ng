@@ -917,7 +917,7 @@ class TestClientCertTypeExtension(unittest.TestCase):
         cert_type = ClientCertTypeExtension()
         cert_type = cert_type.create([0, 1])
 
-        self.assertEqual("ClientCertTypeExtension(certTypes=[0, 1])",
+        self.assertEqual("ClientCertTypeExtension(certTypes=[x509, openpgp])",
                 repr(cert_type))
 
 class TestServerCertTypeExtension(unittest.TestCase):
